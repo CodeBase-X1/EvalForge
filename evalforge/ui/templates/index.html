@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EvalForge — Auto-generate eval suites</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a; color: #e2e8f0; min-height: 100vh;
+    }
+    header {
+      border-bottom: 1px solid #1e293b; padding: 1rem 2rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; }
+    header span { color: #64748b; font-size: 0.875rem; }
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+    .hero { text-align: center; padding: 3rem 0 2rem; }
+    .hero h2 { font-size: 2.5rem; font-weight: 800; line-height: 1.2; margin-bottom: 1rem; }
+    .hero p { color: #94a3b8; font-size: 1.125rem; max-width: 600px; margin: 0 auto 2rem; }
+    .config-card {
+      background: #1e293b; border-radius: 16px; padding: 2rem;
+      max-width: 600px; margin: 0 auto 2rem;
+    }
+    .config-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; color: #94a3b8; }
+    .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .form-group { flex: 1; }
+    label { display: block; font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem; }
+    input {
+      width: 100%; background: #0f172a; border: 1px solid #334155;
+      border-radius: 8px; padding: 0.6rem 0.75rem; color: #e2e8f0;
+      font-size: 0.9rem; outline: none;
+    }
+    input:focus { border-color: #6366f1; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 0.95rem;
+      font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #6366f1; color: white; width: 100%; justify-content: center; }
+    .btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; }
+    .status-section { margin-top: 2rem; }
+    .status-bar {
+      background: #1e293b; border-radius: 12px; padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-idle { background: #475569; }
+    .dot-running { background: #facc15; animation: pulse 1s infinite; }
+    .dot-complete { background: #4ade80; }
+    .dot-error { background: #f87171; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .log-box {
+      background: #020617; border-radius: 10px; padding: 1rem;
+      font-family: monospace; font-size: 0.8rem; color: #94a3b8;
+      max-height: 200px; overflow-y: auto; margin-top: 0.75rem;
+    }
+    .log-line { margin-bottom: 0.25rem; }
+    .log-line::before { content: "› "; color: #6366f1; }
+    .results-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2rem;
+    }
+    .result-card { background: #1e293b; border-radius: 16px; padding: 1.5rem; }
+    .result-card h3 { font-size: 0.875rem; color: #64748b; margin-bottom: 1rem; }
+    .cluster-list { list-style: none; }
+    .cluster-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.6rem 0; border-bottom: 1px solid #0f172a;
+    }
+    .cluster-item:last-child { border-bottom: none; }
+    .cluster-name { flex: 1; font-size: 0.9rem; }
+    .cluster-rate {
+      font-size: 0.8rem; font-weight: 700; padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+    }
+    .rate-high { background: #7f1d1d; color: #f87171; }
+    .rate-mid { background: #713f12; color: #facc15; }
+    .rate-low { background: #14532d; color: #4ade80; }
+    .download-section {
+      background: #1e293b; border-radius: 16px; padding: 1.5rem; margin-top: 1.5rem;
+    }
+    .download-section h3 { font-size: 0.875rem; color: #64748b; margin-bottom: 1rem; }
+    .download-buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .hidden { display: none; }
+    @media (max-width: 700px) { .results-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <span style="font-size:1.5rem">⚒️</span>
+    <h1>EvalForge</h1>
+    <span>Auto-generate eval suites from production traces</span>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h2>Stop writing test cases<br/>by hand.</h2>
+      <p>EvalForge mines your production traffic and auto-generates
+         a complete eval suite for your AI agent.</p>
+    </div>
+
+    <!-- Config form -->
+    <div class="config-card">
+      <h3>PIPELINE SETTINGS</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Trace Limit</label>
+          <input type="number" id="trace-limit" value="500" min="10" max="10000" />
+        </div>
+        <div class="form-group">
+          <label>Project Name (optional)</label>
+          <input type="text" id="project-name" placeholder="my-agent" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="run-btn" onclick="startPipeline()">
+        ▶ Run EvalForge
+      </button>
+    </div>
+
+    <!-- Status -->
+    <div class="status-section">
+      <div class="status-bar" id="status-bar">
+        <div class="dot dot-idle" id="status-dot"></div>
+        <span id="status-text">Ready to run</span>
+      </div>
+      <div class="log-box hidden" id="log-box"></div>
+    </div>
+
+    <!-- Results (hidden until complete) -->
+    <div id="results-section" class="hidden">
+      <div class="results-grid">
+        <div class="result-card">
+          <h3>FAILURE CLUSTERS</h3>
+          <canvas id="cluster-chart" height="200"></canvas>
+        </div>
+        <div class="result-card">
+          <h3>CLUSTERS DETAIL</h3>
+          <ul class="cluster-list" id="cluster-list"></ul>
+        </div>
+      </div>
+
+      <div class="download-section">
+        <h3>DOWNLOAD YOUR EVAL DATASET</h3>
+        <div class="download-buttons">
+          <a href="/api/download/csv" class="btn btn-secondary">⬇ eval_dataset.csv</a>
+          <a href="/api/download/json" class="btn btn-secondary">⬇ eval_dataset.json</a>
+          <a href="/api/download/rubric" class="btn btn-secondary">⬇ judge_rubric.json</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let pollInterval = null;
+    let clusterChart = null;
+
+    async function startPipeline() {
+      const limit = document.getElementById('trace-limit').value;
+      const project = document.getElementById('project-name').value;
+
+      document.getElementById('run-btn').disabled = true;
+      document.getElementById('log-box').classList.remove('hidden');
+      document.getElementById('results-section').classList.add('hidden');
+      setStatus('running', 'Running pipeline...');
+
+      await fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trace_limit: parseInt(limit), project_name: project || null })
+      });
+
+      pollInterval = setInterval(pollStatus, 1500);
+    }
+
+    async function pollStatus() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+
+      // Update log
+      const logBox = document.getElementById('log-box');
+      logBox.innerHTML = data.log.map(l => `<div class="log-line">${l}</div>`).join('');
+      logBox.scrollTop = logBox.scrollHeight;
+
+      if (data.status === 'complete') {
+        clearInterval(pollInterval);
+        setStatus('complete', `Done! ${data.eval_cases_generated} eval cases generated.`);
+        document.getElementById('run-btn').disabled = false;
+        await loadResults();
+        document.getElementById('results-section').classList.remove('hidden');
+      } else if (data.status === 'error') {
+        clearInterval(pollInterval);
+        setStatus('error', `Error: ${data.error}`);
+        document.getElementById('run-btn').disabled = false;
+      } else {
+        setStatus('running',
+          `Running... ${data.traces_loaded} traces, ${data.clusters_found} clusters, ` +
+          `${data.eval_cases_generated} cases`
+        );
+      }
+    }
+
+    function setStatus(state, text) {
+      const dot = document.getElementById('status-dot');
+      dot.className = `dot dot-${state}`;
+      document.getElementById('status-text').textContent = text;
+    }
+
+    async function loadResults() {
+      const res = await fetch('/api/clusters');
+      const clusters = await res.json();
+
+      // Chart
+      const labels = clusters.map(c => c.label);
+      const values = clusters.map(c => Math.round(c.failure_rate * 100));
+      const colors = values.map(v => v > 70 ? '#f87171' : v > 40 ? '#facc15' : '#4ade80');
+
+      if (clusterChart) clusterChart.destroy();
+      clusterChart = new Chart(document.getElementById('cluster-chart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Failure Rate %', data: values, backgroundColor: colors, borderRadius: 6 }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, max: 100, ticks: { color: '#94a3b8' }, grid: { color: '#0f172a' } },
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+          }
+        }
+      });
+
+      // List
+      const list = document.getElementById('cluster-list');
+      list.innerHTML = clusters.map(c => {
+        const pct = Math.round(c.failure_rate * 100);
+        const cls = pct > 70 ? 'rate-high' : pct > 40 ? 'rate-mid' : 'rate-low';
+        return `<li class="cluster-item">
+          <span class="cluster-name">${c.label}</span>
+          <span>${c.size} traces</span>
+          <span class="cluster-rate ${cls}">${pct}% fail</span>
+        </li>`;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
