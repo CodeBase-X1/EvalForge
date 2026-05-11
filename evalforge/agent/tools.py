@@ -51,8 +51,9 @@ async def fetch_traces(
         "failure_rate": len(failures) / len(traces) if traces else 0,
         "message": (
             f"Fetched {len(traces)} traces. "
-            f"Found {len(failures)} failures ({len(failures)/len(traces):.0%})."
-            if traces else "No traces found."
+            f"Found {len(failures)} failures ({len(failures) / len(traces):.0%})."
+            if traces
+            else "No traces found."
         ),
     }
 
@@ -92,8 +93,11 @@ async def cluster_failures(num_clusters: int = 0) -> dict[str, Any]:
         "message": (
             f"Found {len(clusters)} failure clusters. "
             "Worst cluster: "
-            + (f"'{clusters[0].label}' at {clusters[0].failure_rate:.0%} failure rate"
-               if clusters else "none")
+            + (
+                f"'{clusters[0].label}' at {clusters[0].failure_rate:.0%} failure rate"
+                if clusters
+                else "none"
+            )
         ),
     }
 
@@ -123,10 +127,7 @@ async def generate_eval_cases(cases_per_cluster: int = 10) -> dict[str, Any]:
     return {
         "total_cases": len(eval_cases),
         "by_cluster": by_cluster,
-        "message": (
-            f"Generated {len(eval_cases)} eval cases across "
-            f"{len(by_cluster)} clusters."
-        ),
+        "message": (f"Generated {len(eval_cases)} eval cases across {len(by_cluster)} clusters."),
     }
 
 
@@ -179,9 +180,12 @@ def get_pipeline_status() -> dict[str, Any]:
         "clusters_found": len(clusters),
         "eval_cases_generated": len(eval_cases),
         "next_step": (
-            "fetch_traces" if not traces
-            else "cluster_failures" if not clusters
-            else "generate_eval_cases" if not eval_cases
+            "fetch_traces"
+            if not traces
+            else "cluster_failures"
+            if not clusters
+            else "generate_eval_cases"
+            if not eval_cases
             else "export_eval_dataset"
         ),
     }

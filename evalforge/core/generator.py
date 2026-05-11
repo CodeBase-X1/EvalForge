@@ -203,9 +203,7 @@ class EvalGenerator:
             if r.get("criterion")
         ]
 
-        rubric_text = "\n".join(
-            f"- {r.criterion} (weight: {r.weight})" for r in rubric
-        )
+        rubric_text = "\n".join(f"- {r.criterion} (weight: {r.weight})" for r in rubric)
 
         judge_prompt = JUDGE_PROMPT_TEMPLATE.format(
             input=raw["input"],

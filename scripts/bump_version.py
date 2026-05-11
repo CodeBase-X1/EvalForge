@@ -82,11 +82,11 @@ def main() -> None:
         f'__version__ = "{new_version}"',
     )
 
-    print(f"\nDone. Next steps:")
-    print(f"  git add pyproject.toml evalforge/__init__.py")
+    print("\nDone. Next steps:")
+    print("  git add pyproject.toml evalforge/__init__.py")
     print(f"  git commit -m 'chore: bump version to v{new_version}'")
     print(f"  git tag v{new_version}")
-    print(f"  git push && git push --tags")
+    print("  git push && git push --tags")
     print(f"\nGitHub Actions will publish v{new_version} to PyPI automatically.")
 
 

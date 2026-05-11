@@ -55,9 +55,7 @@ def create_agent():
         from google.adk.agents import Agent
         from google.adk.models.lite_llm import LiteLlm
     except ImportError:
-        raise ImportError(
-            "google-adk is required. Install it with: pip install google-adk"
-        )
+        raise ImportError("google-adk is required. Install it with: pip install google-adk")
 
     from evalforge.agent.tools import (
         cluster_failures,
@@ -82,6 +80,7 @@ def create_agent():
     )
 
     return agent
+
 
 async def run_pipeline(
     trace_limit: int = 500,
@@ -108,13 +107,14 @@ async def run_pipeline(
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-
         # Step 1: Fetch
         task = progress.add_task("Fetching traces from Phoenix...", total=None)
         fetcher = PhoenixFetcher()
         traces = await fetcher.fetch_traces(limit=trace_limit, project_name=project_name)
         failures = [t for t in traces if t.is_failure]
-        progress.update(task, description=f"✓ Fetched {len(traces)} traces, {len(failures)} failures")
+        progress.update(
+            task, description=f"✓ Fetched {len(traces)} traces, {len(failures)} failures"
+        )
         progress.stop_task(task)
 
         if not failures:
@@ -138,6 +138,7 @@ async def run_pipeline(
         # Step 4: Export
         task = progress.add_task("Exporting eval dataset...", total=None)
         from pathlib import Path
+
         out = Path(output_dir or settings.evalforge_output_dir)
         csv_exporter.export_eval_cases(eval_cases, out / "eval_dataset.csv")
         json_exporter.export_eval_cases(eval_cases, out / "eval_dataset.json")

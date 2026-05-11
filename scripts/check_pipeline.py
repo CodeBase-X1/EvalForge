@@ -8,15 +8,16 @@ Run:
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from evalforge.core.fetcher import PhoenixFetcher
-from evalforge.core.clusterer import FailureClusterer
-from evalforge.exporters import csv_exporter, json_exporter
 from pathlib import Path
+
+from evalforge.core.clusterer import FailureClusterer
+from evalforge.core.fetcher import PhoenixFetcher
+from evalforge.exporters import csv_exporter, json_exporter
 
 
 async def main():
@@ -44,8 +45,9 @@ async def main():
 
     # Step 3: Export (skip Gemini generation — no API key in smoke test)
     print("Step 3: Testing exporters...")
-    from evalforge.models import EvalCase, ScoringCriteria
     import uuid
+
+    from evalforge.models import EvalCase, ScoringCriteria
 
     dummy_cases = [
         EvalCase(

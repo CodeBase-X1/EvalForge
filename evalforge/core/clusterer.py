@@ -67,8 +67,7 @@ class FailureClusterer:
 
         for c in clusters:
             logger.info(
-                f"  Cluster '{c.label}': {c.size} traces, "
-                f"{c.failure_rate:.0%} failure rate"
+                f"  Cluster '{c.label}': {c.size} traces, {c.failure_rate:.0%} failure rate"
             )
 
         return clusters
@@ -141,10 +140,12 @@ class FailureClusterer:
 
         logger.info("Using TF-IDF + SVD embeddings (scikit-learn fallback)")
         n_components = min(64, len(texts) - 1)
-        pipe = Pipeline([
-            ("tfidf", TfidfVectorizer(ngram_range=(1, 2), max_features=10_000)),
-            ("svd", TruncatedSVD(n_components=n_components, random_state=42)),
-        ])
+        pipe = Pipeline(
+            [
+                ("tfidf", TfidfVectorizer(ngram_range=(1, 2), max_features=10_000)),
+                ("svd", TruncatedSVD(n_components=n_components, random_state=42)),
+            ]
+        )
         return pipe.fit_transform(texts).astype(np.float32)
 
     # ── Clustering ────────────────────────────────────────────────────────────
@@ -159,23 +160,23 @@ class FailureClusterer:
         from sklearn.preprocessing import normalize
 
         # L2-normalize embeddings for cosine-like distance
-        X = normalize(embeddings)
+        x_norm = normalize(embeddings)
 
         k = self.num_clusters
         if k == 0:
-            k = self._find_best_k(X, n_traces)
+            k = self._find_best_k(x_norm, n_traces)
 
         logger.info(f"Running KMeans with k={k}")
         kmeans = KMeans(n_clusters=k, random_state=42, n_init="auto")
-        labels = kmeans.fit_predict(X)
+        labels = kmeans.fit_predict(x_norm)
 
         if len(set(labels)) > 1:
-            score = silhouette_score(X, labels)
+            score = silhouette_score(x_norm, labels)
             logger.info(f"Silhouette score: {score:.3f}")
 
         return labels
 
-    def _find_best_k(self, X: np.ndarray, n_traces: int) -> int:
+    def _find_best_k(self, x_norm: np.ndarray, n_traces: int) -> int:
         """
         Try k from 2 to sqrt(n) and pick the k with the best silhouette score.
         """
@@ -187,10 +188,10 @@ class FailureClusterer:
 
         for k in range(2, max_k + 1):
             km = KMeans(n_clusters=k, random_state=42, n_init="auto")
-            labels = km.fit_predict(X)
+            labels = km.fit_predict(x_norm)
             if len(set(labels)) < 2:
                 continue
-            s = silhouette_score(X, labels)
+            s = silhouette_score(x_norm, labels)
             logger.debug(f"  k={k} → silhouette={s:.3f}")
             if s > best_score:
                 best_score = s
@@ -210,13 +211,13 @@ class FailureClusterer:
         """Group traces by cluster label and compute failure rates."""
         from sklearn.preprocessing import normalize
 
-        X = normalize(embeddings)
+        x_norm = normalize(embeddings)
         clusters: list[Cluster] = []
 
         for cluster_id in sorted(set(labels)):
             mask = labels == cluster_id
             cluster_traces = [t for t, m in zip(traces, mask) if m]
-            cluster_embeddings = X[mask]
+            cluster_embeddings = x_norm[mask]
 
             # Centroid = mean of normalized embeddings
             centroid = cluster_embeddings.mean(axis=0).tolist()
@@ -254,9 +255,7 @@ class FailureClusterer:
 
         labeled: list[Cluster] = []
         for cluster in clusters:
-            examples = "\n".join(
-                f"- {inp}" for inp in cluster.representative_inputs
-            )
+            examples = "\n".join(f"- {inp}" for inp in cluster.representative_inputs)
             prompt = (
                 "You are analyzing a cluster of user questions to an AI assistant.\n\n"
                 f"Here are {min(5, cluster.size)} representative questions from this cluster:\n"

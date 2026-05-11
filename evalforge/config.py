@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # EvalForge pipeline
     evalforge_trace_limit: int = 500
     evalforge_failure_threshold: float = 0.5
-    evalforge_num_clusters: int = 0          # 0 = auto-detect
+    evalforge_num_clusters: int = 0  # 0 = auto-detect
     evalforge_cases_per_cluster: int = 10
     evalforge_output_dir: str = "./output"
 

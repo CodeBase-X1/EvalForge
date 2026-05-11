@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from evalforge.config import settings
 from evalforge.models import EvalCase, EvalResult, ScoreLevel
@@ -30,7 +31,7 @@ class EvalRunner:
         results = await runner.run(eval_cases)
     """
 
-    PASS_THRESHOLD = 7.0    # score >= 7 → pass
+    PASS_THRESHOLD = 7.0  # score >= 7 → pass
     PARTIAL_THRESHOLD = 4.0  # score >= 4 → partial
 
     def __init__(
@@ -57,17 +58,12 @@ class EvalRunner:
         Requires agent_fn to be set.
         """
         if self.agent_fn is None:
-            raise ValueError(
-                "agent_fn is required. Pass your agent callable to EvalRunner()."
-            )
+            raise ValueError("agent_fn is required. Pass your agent callable to EvalRunner().")
 
         logger.info(f"Running {len(eval_cases)} eval cases (concurrency={self.concurrency})")
 
         semaphore = asyncio.Semaphore(self.concurrency)
-        tasks = [
-            self._run_single(case, semaphore)
-            for case in eval_cases
-        ]
+        tasks = [self._run_single(case, semaphore) for case in eval_cases]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out exceptions and log them
@@ -180,6 +176,6 @@ class EvalRunner:
         avg_score = sum(r.score for r in results) / total
 
         logger.info(
-            f"Eval complete: {passed}/{total} pass ({passed/total:.0%}), "
+            f"Eval complete: {passed}/{total} pass ({passed / total:.0%}), "
             f"{partial} partial, {failed} fail | avg score: {avg_score:.1f}/10"
         )

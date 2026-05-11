@@ -70,9 +70,8 @@ all = [
     "evalforge[ui,agent,phoenix,embeddings]",
 ]
 
-# pip install evalforge[dev]  — development tools
+# pip install evalforge[dev]  — development tools (tests + lint only, no heavy optionals)
 dev = [
-    "evalforge[all]",
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=5.0.0",
