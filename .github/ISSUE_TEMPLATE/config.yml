@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / Discussion
+    url: https://github.com/evalforge/evalforge/discussions
+    about: Ask questions and discuss ideas in GitHub Discussions
+  - name: Discord Community
+    url: https://discord.gg/evalforge
+    about: Chat with the community on Discord

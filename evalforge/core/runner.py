@@ -126,22 +126,24 @@ class EvalRunner:
         semaphore: asyncio.Semaphore,
     ) -> EvalResult:
         """Score one eval case using LLM-as-a-judge."""
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(
-            settings.gemini_model,
-            generation_config={"response_mime_type": "application/json"},
-        )
+        client = genai.Client(api_key=settings.gemini_api_key)
 
         # Fill in the actual output in the judge prompt
         judge_prompt = case.judge_prompt.replace("{actual_output}", actual_output)
 
         try:
-            response = await model.generate_content_async(judge_prompt)
+            response = client.models.generate_content(
+                model=settings.gemini_model,
+                contents=judge_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
             judgment = json.loads(response.text)
         except json.JSONDecodeError:
-            # Fallback: try to extract score from raw text
             judgment = {"score": 0, "reasoning": "Failed to parse judge response"}
         except Exception as exc:
             logger.warning(f"Judge API error for case {case.case_id}: {exc}")

@@ -26,6 +26,25 @@ app = typer.Typer(
 console = Console()
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        from evalforge import __version__
+        typer.echo(f"evalforge {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None, "--version", "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show version and exit.",
+    ),
+) -> None:
+    """EvalForge — auto-generate eval suites from production AI agent traces."""
+
+
 @app.command()
 def run(
     traces: int = typer.Option(500, "--traces", "-n", help="Number of traces to analyze"),

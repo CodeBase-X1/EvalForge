@@ -83,7 +83,6 @@ def create_agent():
 
     return agent
 
-
 async def run_pipeline(
     trace_limit: int = 500,
     output_dir: str | None = None,
