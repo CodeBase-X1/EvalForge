@@ -13,8 +13,8 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-pro"
-    gemini_embedding_model: str = "models/text-embedding-004"
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_embedding_model: str = "text-embedding-004"
 
     # Phoenix
     phoenix_endpoint: str = "http://localhost:6006"
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # EvalForge pipeline
     evalforge_trace_limit: int = 500
     evalforge_failure_threshold: float = 0.5
-    evalforge_num_clusters: int = 0          # 0 = auto-detect
+    evalforge_num_clusters: int = 0  # 0 = auto-detect
     evalforge_cases_per_cluster: int = 10
     evalforge_output_dir: str = "./output"
 

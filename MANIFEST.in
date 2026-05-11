@@ -1,0 +1,25 @@
+# Files to include in the source distribution (sdist)
+include LICENSE
+include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include pyproject.toml
+include .env.example
+
+# Include all package source
+recursive-include evalforge *.py
+recursive-include evalforge/ui/templates *.html
+recursive-include evalforge/ui/static *
+
+# Exclude dev/test artifacts
+exclude .env
+exclude .pre-commit-config.yaml
+recursive-exclude tests *
+recursive-exclude scripts *
+recursive-exclude examples *
+recursive-exclude docs *
+recursive-exclude .github *
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store

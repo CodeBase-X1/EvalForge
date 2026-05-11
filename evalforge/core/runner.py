@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from evalforge.config import settings
 from evalforge.models import EvalCase, EvalResult, ScoreLevel
@@ -30,7 +31,7 @@ class EvalRunner:
         results = await runner.run(eval_cases)
     """
 
-    PASS_THRESHOLD = 7.0    # score >= 7 → pass
+    PASS_THRESHOLD = 7.0  # score >= 7 → pass
     PARTIAL_THRESHOLD = 4.0  # score >= 4 → partial
 
     def __init__(
@@ -57,17 +58,12 @@ class EvalRunner:
         Requires agent_fn to be set.
         """
         if self.agent_fn is None:
-            raise ValueError(
-                "agent_fn is required. Pass your agent callable to EvalRunner()."
-            )
+            raise ValueError("agent_fn is required. Pass your agent callable to EvalRunner().")
 
         logger.info(f"Running {len(eval_cases)} eval cases (concurrency={self.concurrency})")
 
         semaphore = asyncio.Semaphore(self.concurrency)
-        tasks = [
-            self._run_single(case, semaphore)
-            for case in eval_cases
-        ]
+        tasks = [self._run_single(case, semaphore) for case in eval_cases]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out exceptions and log them
@@ -126,22 +122,24 @@ class EvalRunner:
         semaphore: asyncio.Semaphore,
     ) -> EvalResult:
         """Score one eval case using LLM-as-a-judge."""
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(
-            settings.gemini_model,
-            generation_config={"response_mime_type": "application/json"},
-        )
+        client = genai.Client(api_key=settings.gemini_api_key)
 
         # Fill in the actual output in the judge prompt
         judge_prompt = case.judge_prompt.replace("{actual_output}", actual_output)
 
         try:
-            response = await model.generate_content_async(judge_prompt)
+            response = client.models.generate_content(
+                model=settings.gemini_model,
+                contents=judge_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
             judgment = json.loads(response.text)
         except json.JSONDecodeError:
-            # Fallback: try to extract score from raw text
             judgment = {"score": 0, "reasoning": "Failed to parse judge response"}
         except Exception as exc:
             logger.warning(f"Judge API error for case {case.case_id}: {exc}")
@@ -178,6 +176,6 @@ class EvalRunner:
         avg_score = sum(r.score for r in results) / total
 
         logger.info(
-            f"Eval complete: {passed}/{total} pass ({passed/total:.0%}), "
+            f"Eval complete: {passed}/{total} pass ({passed / total:.0%}), "
             f"{partial} partial, {failed} fail | avg score: {avg_score:.1f}/10"
         )

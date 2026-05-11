@@ -9,15 +9,12 @@ Run with:
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
 from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from evalforge.config import settings
@@ -52,6 +49,7 @@ _pipeline_state: dict[str, Any] = {
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -70,6 +68,7 @@ async def results_page(request: Request):
 
 
 # ── API ───────────────────────────────────────────────────────────────────────
+
 
 @app.get("/api/status")
 async def get_status():
@@ -178,6 +177,7 @@ async def download_rubric():
 
 
 # ── Background pipeline ───────────────────────────────────────────────────────
+
 
 def _log(msg: str) -> None:
     logger.info(msg)

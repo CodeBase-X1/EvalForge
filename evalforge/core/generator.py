@@ -131,13 +131,10 @@ class EvalGenerator:
 
     async def _generate_for_cluster(self, cluster: Cluster) -> list[EvalCase]:
         """Generate eval cases for a single cluster."""
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(
-            settings.gemini_model,
-            generation_config={"response_mime_type": "application/json"},
-        )
+        client = genai.Client(api_key=settings.gemini_api_key)
 
         # Build example interactions for the prompt
         examples = self._format_examples(cluster)
@@ -150,7 +147,13 @@ class EvalGenerator:
         )
 
         try:
-            response = await model.generate_content_async(prompt)
+            response = client.models.generate_content(
+                model=settings.gemini_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
             raw_cases = json.loads(response.text)
         except json.JSONDecodeError as exc:
             logger.error(f"Gemini returned invalid JSON for cluster '{cluster.label}': {exc}")
@@ -200,9 +203,7 @@ class EvalGenerator:
             if r.get("criterion")
         ]
 
-        rubric_text = "\n".join(
-            f"- {r.criterion} (weight: {r.weight})" for r in rubric
-        )
+        rubric_text = "\n".join(f"- {r.criterion} (weight: {r.weight})" for r in rubric)
 
         judge_prompt = JUDGE_PROMPT_TEMPLATE.format(
             input=raw["input"],

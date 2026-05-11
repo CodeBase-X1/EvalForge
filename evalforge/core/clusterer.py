@@ -67,8 +67,7 @@ class FailureClusterer:
 
         for c in clusters:
             logger.info(
-                f"  Cluster '{c.label}': {c.size} traces, "
-                f"{c.failure_rate:.0%} failure rate"
+                f"  Cluster '{c.label}': {c.size} traces, {c.failure_rate:.0%} failure rate"
             )
 
         return clusters
@@ -79,43 +78,75 @@ class FailureClusterer:
         """
         Embed trace inputs.
 
-        Tries Gemini embeddings first; falls back to sentence-transformers
-        if the Gemini API key is not set.
+        Priority:
+          1. Gemini text-embedding-004 (best quality, requires API key)
+          2. sentence-transformers all-MiniLM-L6-v2 (good quality, local)
+          3. scikit-learn TF-IDF (always available, no extra deps)
         """
         texts = [t.input for t in traces]
 
         if settings.gemini_api_key:
             return await self._embed_with_gemini(texts)
-        else:
+
+        # Try sentence-transformers; fall back to TF-IDF if unavailable
+        try:
             return self._embed_with_sentence_transformers(texts)
+        except Exception as exc:
+            logger.warning(
+                f"sentence-transformers unavailable ({exc}). "
+                "Falling back to TF-IDF embeddings. "
+                "Set GEMINI_API_KEY for better clustering quality."
+            )
+            return self._embed_with_tfidf(texts)
 
     async def _embed_with_gemini(self, texts: list[str]) -> np.ndarray:
         """Use Gemini text-embedding-004 to embed texts in batches."""
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
-        genai.configure(api_key=settings.gemini_api_key)
+        client = genai.Client(api_key=settings.gemini_api_key)
 
         batch_size = 100  # Gemini embedding API limit
         all_embeddings: list[list[float]] = []
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            result = genai.embed_content(
+            result = client.models.embed_content(
                 model=settings.gemini_embedding_model,
-                content=batch,
-                task_type="CLUSTERING",
+                contents=batch,
+                config=types.EmbedContentConfig(task_type="CLUSTERING"),
             )
-            all_embeddings.extend(result["embedding"])
+            all_embeddings.extend([e.values for e in result.embeddings])
 
         return np.array(all_embeddings, dtype=np.float32)
 
     def _embed_with_sentence_transformers(self, texts: list[str]) -> np.ndarray:
-        """Fallback: use sentence-transformers (runs locally, no API key needed)."""
+        """Use sentence-transformers (runs locally, no API key needed)."""
         from sentence_transformers import SentenceTransformer
 
         logger.info("Using sentence-transformers for embeddings (no Gemini key set)")
         model = SentenceTransformer("all-MiniLM-L6-v2")
-        return model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
+        return model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
+
+    def _embed_with_tfidf(self, texts: list[str]) -> np.ndarray:
+        """
+        Fallback: TF-IDF sparse → dense via SVD (no GPU, no downloads).
+
+        Lower quality than neural embeddings but always works.
+        """
+        from sklearn.decomposition import TruncatedSVD
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.pipeline import Pipeline
+
+        logger.info("Using TF-IDF + SVD embeddings (scikit-learn fallback)")
+        n_components = min(64, len(texts) - 1)
+        pipe = Pipeline(
+            [
+                ("tfidf", TfidfVectorizer(ngram_range=(1, 2), max_features=10_000)),
+                ("svd", TruncatedSVD(n_components=n_components, random_state=42)),
+            ]
+        )
+        return pipe.fit_transform(texts).astype(np.float32)
 
     # ── Clustering ────────────────────────────────────────────────────────────
 
@@ -129,23 +160,23 @@ class FailureClusterer:
         from sklearn.preprocessing import normalize
 
         # L2-normalize embeddings for cosine-like distance
-        X = normalize(embeddings)
+        x_norm = normalize(embeddings)
 
         k = self.num_clusters
         if k == 0:
-            k = self._find_best_k(X, n_traces)
+            k = self._find_best_k(x_norm, n_traces)
 
         logger.info(f"Running KMeans with k={k}")
         kmeans = KMeans(n_clusters=k, random_state=42, n_init="auto")
-        labels = kmeans.fit_predict(X)
+        labels = kmeans.fit_predict(x_norm)
 
         if len(set(labels)) > 1:
-            score = silhouette_score(X, labels)
+            score = silhouette_score(x_norm, labels)
             logger.info(f"Silhouette score: {score:.3f}")
 
         return labels
 
-    def _find_best_k(self, X: np.ndarray, n_traces: int) -> int:
+    def _find_best_k(self, x_norm: np.ndarray, n_traces: int) -> int:
         """
         Try k from 2 to sqrt(n) and pick the k with the best silhouette score.
         """
@@ -157,10 +188,10 @@ class FailureClusterer:
 
         for k in range(2, max_k + 1):
             km = KMeans(n_clusters=k, random_state=42, n_init="auto")
-            labels = km.fit_predict(X)
+            labels = km.fit_predict(x_norm)
             if len(set(labels)) < 2:
                 continue
-            s = silhouette_score(X, labels)
+            s = silhouette_score(x_norm, labels)
             logger.debug(f"  k={k} → silhouette={s:.3f}")
             if s > best_score:
                 best_score = s
@@ -180,13 +211,13 @@ class FailureClusterer:
         """Group traces by cluster label and compute failure rates."""
         from sklearn.preprocessing import normalize
 
-        X = normalize(embeddings)
+        x_norm = normalize(embeddings)
         clusters: list[Cluster] = []
 
         for cluster_id in sorted(set(labels)):
             mask = labels == cluster_id
             cluster_traces = [t for t, m in zip(traces, mask) if m]
-            cluster_embeddings = X[mask]
+            cluster_embeddings = x_norm[mask]
 
             # Centroid = mean of normalized embeddings
             centroid = cluster_embeddings.mean(axis=0).tolist()
@@ -214,20 +245,17 @@ class FailureClusterer:
 
     async def _label_clusters(self, clusters: list[Cluster]) -> list[Cluster]:
         """Ask Gemini to give each cluster a short, descriptive topic label."""
-        import google.generativeai as genai
+        from google import genai
 
         if not settings.gemini_api_key:
             logger.warning("No Gemini API key — skipping cluster labeling")
             return clusters
 
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
+        client = genai.Client(api_key=settings.gemini_api_key)
 
         labeled: list[Cluster] = []
         for cluster in clusters:
-            examples = "\n".join(
-                f"- {inp}" for inp in cluster.representative_inputs
-            )
+            examples = "\n".join(f"- {inp}" for inp in cluster.representative_inputs)
             prompt = (
                 "You are analyzing a cluster of user questions to an AI assistant.\n\n"
                 f"Here are {min(5, cluster.size)} representative questions from this cluster:\n"
@@ -239,7 +267,10 @@ class FailureClusterer:
             )
 
             try:
-                response = await model.generate_content_async(prompt)
+                response = client.models.generate_content(
+                    model=settings.gemini_model,
+                    contents=prompt,
+                )
                 raw_label = response.text.strip().lower().replace(" ", "_")
                 # Sanitize: keep only alphanumeric and underscores
                 label = "".join(c for c in raw_label if c.isalnum() or c == "_")

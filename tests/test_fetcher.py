@@ -1,6 +1,6 @@
 """Tests for the Phoenix trace fetcher."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

@@ -10,9 +10,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -26,12 +23,34 @@ app = typer.Typer(
 console = Console()
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        from evalforge import __version__
+
+        typer.echo(f"evalforge {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool | None = typer.Option(
+        None,
+        "--version",
+        "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show version and exit.",
+    ),
+) -> None:
+    """EvalForge — auto-generate eval suites from production AI agent traces."""
+
+
 @app.command()
 def run(
     traces: int = typer.Option(500, "--traces", "-n", help="Number of traces to analyze"),
     output: str = typer.Option("./output", "--output", "-o", help="Output directory"),
-    project: Optional[str] = typer.Option(None, "--project", "-p", help="Phoenix project name"),
-    phoenix: Optional[str] = typer.Option(None, "--phoenix", help="Phoenix endpoint URL"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Phoenix project name"),
+    phoenix: str | None = typer.Option(None, "--phoenix", help="Phoenix endpoint URL"),
     clusters: int = typer.Option(0, "--clusters", "-k", help="Number of clusters (0=auto)"),
     cases: int = typer.Option(10, "--cases", "-c", help="Eval cases per cluster"),
 ) -> None:

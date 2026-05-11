@@ -1,6 +1,7 @@
 """Tests for EvalForge data models."""
 
 import pytest
+
 from evalforge.models import (
     Cluster,
     EvalCase,

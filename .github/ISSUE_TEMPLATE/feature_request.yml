@@ -1,0 +1,47 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea? We'd love to hear it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case. What are you trying to do that EvalForge doesn't support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Any workarounds you're using today?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this affect?
+      options:
+        - Trace fetching (Phoenix / LangSmith / Langfuse)
+        - Clustering
+        - Eval generation
+        - LLM-as-a-judge
+        - Exporters (CSV / JSON / HTML)
+        - Web UI
+        - CLI
+        - Documentation
+        - Other
+    validations:
+      required: true
