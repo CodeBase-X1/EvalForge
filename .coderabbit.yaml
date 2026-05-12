@@ -1,0 +1,92 @@
+# CodeRabbit configuration for EvalForge
+# Docs: https://docs.coderabbit.ai/reference/configuration
+
+language: "en-US"
+
+reviews:
+  profile: "assertive"         # thorough reviews — this is a public OSS project
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  poem: false                  # skip the poem, keep it professional
+
+  # Don't auto-review WIP / draft PRs
+  auto_review:
+    enabled: true
+    drafts: false
+    ignore_title_keywords:
+      - "wip"
+      - "draft"
+      - "do not merge"
+      - "dnm"
+
+  # What CodeRabbit should focus on for this project
+  path_instructions:
+    - path: "evalforge/core/**"
+      instructions: |
+        This is the core pipeline. Review carefully for:
+        - Correctness of the 4-step pipeline (fetch → cluster → generate → run)
+        - Async/await usage — all Gemini API calls must be awaited
+        - Error handling — API failures should be caught and logged, not crash the pipeline
+        - Type annotations — all public functions must have full type hints
+
+    - path: "evalforge/agent/**"
+      instructions: |
+        Google ADK agent code. Check that:
+        - Tool functions have clear docstrings (they become the agent's tool descriptions)
+        - Tool return types are plain dicts (JSON-serializable)
+        - No side effects beyond updating _state
+
+    - path: "evalforge/exporters/**"
+      instructions: |
+        Export code. Verify:
+        - All exporters create parent directories before writing
+        - File paths are returned as Path objects
+        - No data is silently dropped during export
+
+    - path: "evalforge/ui/**"
+      instructions: |
+        FastAPI web UI. Check for:
+        - No blocking calls in async route handlers
+        - Proper HTTP status codes on error responses
+        - No secrets or API keys leaked in responses
+
+    - path: "tests/**"
+      instructions: |
+        Test code. Ensure:
+        - Tests are isolated (no shared mutable state between tests)
+        - Async tests use @pytest.mark.asyncio
+        - External API calls (Gemini, Phoenix) are mocked — no real network calls in tests
+        - New features have corresponding tests
+
+    - path: "pyproject.toml"
+      instructions: |
+        Package config. Check that:
+        - New dependencies are added to the correct extras (not dumped into core)
+        - Version is not manually changed (use scripts/bump_version.py)
+        - Core dependencies stay minimal
+
+  # Enable static analysis tools
+  tools:
+    ruff:
+      enabled: true
+    gitleaks:
+      enabled: true       # catch accidentally committed secrets
+    semgrep:
+      enabled: true
+
+# Auto-reply to CodeRabbit comments in PR threads
+chat:
+  auto_reply: true
+
+# Knowledge base — teach CodeRabbit about this project
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CONTRIBUTING.md"
+      - ".github/pull_request_template.md"
+
+  # Learnings from past reviews carry over to future PRs
+  learnings:
+    scope: "auto"
