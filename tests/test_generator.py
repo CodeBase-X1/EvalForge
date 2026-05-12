@@ -67,7 +67,9 @@ class TestEvalGenerator:
     def test_is_valid_raw_case_wrong_type(self):
         gen = EvalGenerator()
         assert gen._is_valid_raw_case("not a dict") is False  # type: ignore
-        assert gen._is_valid_raw_case({"input": "q", "expected_output": "a", "rubric": "bad"}) is False
+        assert (
+            gen._is_valid_raw_case({"input": "q", "expected_output": "a", "rubric": "bad"}) is False
+        )
 
     def test_raw_to_eval_case(self):
         gen = EvalGenerator()
