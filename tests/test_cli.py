@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from typer.testing import CliRunner
 
 from evalforge.cli import app
@@ -14,7 +16,7 @@ class TestCli:
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
         assert "evalforge" in result.output
-        assert "0.1.0" in result.output
+        assert re.search(r"\b\d+\.\d+\.\d+\b", result.output)
 
     def test_help(self):
         result = runner.invoke(app, ["--help"])

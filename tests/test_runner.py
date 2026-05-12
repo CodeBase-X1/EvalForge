@@ -42,6 +42,7 @@ class TestEvalRunner:
         runner = EvalRunner(agent_fn=None)
         with pytest.raises(ValueError, match="agent_fn is required"):
             import asyncio
+
             asyncio.run(runner.run([make_case()]))
 
     @pytest.mark.asyncio
@@ -60,12 +61,13 @@ class TestEvalRunner:
         mock_judgment_pass = {"score": 9, "reasoning": "Mentions days correctly"}
         mock_judgment_fail = {"score": 2, "reasoning": "No useful information"}
 
-        call_count = 0
+        judgment_by_case_id = {
+            "c1": mock_judgment_pass,
+            "c2": mock_judgment_fail,
+        }
 
         async def mock_score(case, output, semaphore):
-            nonlocal call_count
-            j = mock_judgment_pass if call_count == 0 else mock_judgment_fail
-            call_count += 1
+            j = judgment_by_case_id[case.case_id]
             score = float(j["score"])
             return EvalResult(
                 case_id=case.case_id,
